@@ -31,3 +31,4 @@ case class SendNotice(target: String, notice: String) extends PluginMessage
 case class SendAction(target: String, msg: String) extends PluginMessage
 case class GetUsers(channel: String) extends PluginMessage
 case class VoiceUser(channel: String, user: String) extends PluginMessage
+case class Log(msg: String)
