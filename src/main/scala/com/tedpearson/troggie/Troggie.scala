@@ -7,13 +7,15 @@ import java.io.FileOutputStream
 import java.io.FileWriter
 import java.sql.DriverManager
 import java.util.Properties
-
 import org.jibble.pircbot.PircBot
-
 import akka.actor._
 import akka.routing.BroadcastRouter
+import scala.compat.Platform._
+import org.joda.time.format.PeriodFormat
+import org.joda.time.Period
 
 class Troggie(network: String) extends PircBot with Actor {
+	var (sentMsgs, recdMsgs) = (0L, 0L)
   val version = "3.0b1"
   import Troggie._ => t
   val logfile = new File(properties.getProperty("logfile","troggie.log"))
@@ -68,14 +70,32 @@ class Troggie(network: String) extends PircBot with Actor {
   }
   
   def receive = {
+  	case s: SendMessage => {
+  		if(s.count) sentMsgs += 1
+  		sendMessage(s.target, s.msg)
+  	}
     case _ => log("unknown msg")
+  }
+  
+  val StatusRE = """(?i)^\s*status\s*\?*$""".r
+  val launchTime = currentTime
+  val periodFormatter = PeriodFormat.getDefault()
+  def doStatus(from: String, msg: String) {
+  	log(msg)
+    msg match {
+    	case StatusRE() => {
+    		val period = periodFormatter.print(new Period(launchTime, currentTime))
+    		self ! SendMessage(from, "Uptime: %s. Messages in/out: %d/%d."
+    				format(period, recdMsgs, sentMsgs), true)
+    	}
+    	case _ =>
+    }
   }
 
   override def log(line: String) {
     if(!line.contains("PING :") & !line.contains("PONG :")) {
-      val toLog = scala.compat.Platform.currentTime + " " + line
+      val toLog = currentTime + " " + line
           log.write(toLog)
-          log.write(self.path.name)
           log.newLine()
           log.flush
           Console.println(toLog)
@@ -99,10 +119,14 @@ class Troggie(network: String) extends PircBot with Actor {
   }
   
   override def onMessage(channel: String, sender: String, login: String, host: String, msg: String) {
+  	recdMsgs += 1
+  	doStatus(channel, msg)
     router ! Message(channel, sender, login, host, msg)
   }
   
   override def onPrivateMessage(sender: String, login: String, host: String, msg: String) {
+  	recdMsgs += 1
+    doStatus(sender, msg)
     router ! PrivateMessage(sender, login, host, msg)
   }
   
