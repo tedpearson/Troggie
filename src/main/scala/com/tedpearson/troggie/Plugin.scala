@@ -1,7 +1,9 @@
 package com.tedpearson.troggie
 import java.util.Properties
+
+import org.scalaquery.session.Session
+
 import akka.actor._
-import java.sql.Connection
 
 abstract class Plugin(conf: PluginConf) extends Actor {
 	def getStatusString = ""
@@ -12,4 +14,4 @@ abstract class Plugin(conf: PluginConf) extends Actor {
 	protected def processMessage(m: IrcMessage): Unit
 }
 
-case class PluginConf(p: Properties, conn: Connection)
+case class PluginConf(p: Properties, session: Session) {}

@@ -13,6 +13,7 @@ import akka.routing.BroadcastRouter
 import scala.compat.Platform._
 import org.joda.time.format.PeriodFormat
 import org.joda.time.Period
+import org.scalaquery.session.Database
 
 class Troggie(network: String) extends PircBot with Actor {
 	var (sentMsgs, recdMsgs) = (0L, 0L)
@@ -27,8 +28,9 @@ class Troggie(network: String) extends PircBot with Actor {
   setLogin(nick)
   setEncoding("UTF-8")
   val port = Integer.parseInt(properties.getProperty("port", "6667"))
+  val database = properties.getProperty("database")
+  val session = Database.forURL("jdbc:sqlite:%s" format database, driver = "org.sqlite.JDBC").createSession()
   val router = loadPlugins
-  log(router.toString)
   
   // don't connect until actor is started
   // otherwise we try to start sending messages before akka is ready
@@ -40,6 +42,7 @@ class Troggie(network: String) extends PircBot with Actor {
   // disconnect when akka is shut down so the program will die appropriately
   override def postStop() {
     dispose
+    session.close
   }
 
   private def joinChannels {
@@ -49,14 +52,11 @@ class Troggie(network: String) extends PircBot with Actor {
   }
   
   private def loadPlugins: ActorRef = {
-    val conf = new PluginConf(properties, conn)
+    val conf = new PluginConf(properties, session)
     val active = for(plugin <- properties.getProperty("plugins").split(",") if pluginDefined(plugin))
       yield context.actorOf(Props(
           Class.forName(plugin).getConstructor(classOf[PluginConf]).newInstance(conf).asInstanceOf[Plugin]), name=plugin)
-    val router = context.actorOf(Props[Plugin].withRouter(BroadcastRouter(routees = active)))
-    log(active.size.toString())
-    log(router.toString)
-    router
+    context.actorOf(Props[Plugin].withRouter(BroadcastRouter(routees = active)), name="router")
   }
   
   private def pluginDefined(plugin: String) = {
@@ -81,14 +81,10 @@ class Troggie(network: String) extends PircBot with Actor {
   val launchTime = currentTime
   val periodFormatter = PeriodFormat.getDefault()
   def doStatus(from: String, msg: String) {
-  	log(msg)
-    msg match {
-    	case StatusRE() => {
+  	if(StatusRE.pattern.matcher(msg).matches) {
     		val period = periodFormatter.print(new Period(launchTime, currentTime))
     		self ! SendMessage(from, "Uptime: %s. Messages in/out: %d/%d."
     				format(period, recdMsgs, sentMsgs), true)
-    	}
-    	case _ =>
     }
   }
 
@@ -157,6 +153,7 @@ class Troggie(network: String) extends PircBot with Actor {
         Thread sleep 1000
         joinChannel(channel)
       }
+      case _ =>
     }
     router ! Kick(channel, sender, login, host, rcpt, msg)
   }
@@ -215,8 +212,6 @@ object Troggie extends App {
   properties.load(new FileInputStream(propFile))
   val networks = properties.getProperty("networks").split(",")
   
-  val conn = dbConnect(properties.getProperty("database"))
-  
   val system = ActorSystem("Troggie")
   
   for(n <- networks) {
@@ -235,15 +230,5 @@ object Troggie extends App {
       try { Thread.sleep(1000) } catch { case _: InterruptedException => () }
     }
     system.shutdown()
-  }
-  
-  private def dbConnect(database: String) = {
-     try {
-      Class.forName("org.sqlite.JDBC")
-    } catch {
-      case e: Exception => e.printStackTrace()
-          System.exit(1)
-    }
-    DriverManager.getConnection("jdbc:sqlite:%s" format database)
   }
 }
