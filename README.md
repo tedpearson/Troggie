@@ -20,7 +20,7 @@ nice quit message
 * implement ignore list. possibly in the router? subclass it?
 * finish Seen plugin implementation
 * implement important or working plugins in Java version before releasing beta:
-	* UrlTitle
-	* Seen
-	* Factoid
+  * UrlTitle
+  * Seen
+  * Factoid
 * do we really need the extended driver? try without autoinc

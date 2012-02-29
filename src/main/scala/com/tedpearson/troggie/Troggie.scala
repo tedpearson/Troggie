@@ -16,7 +16,7 @@ import org.joda.time.Period
 import org.scalaquery.session.Database
 
 class Troggie(network: String) extends PircBot with Actor {
-	var (sentMsgs, recdMsgs) = (0L, 0L)
+  var (sentMsgs, recdMsgs) = (0L, 0L)
   val version = "3.0b1"
   import Troggie._ => t
   val logfile = new File(properties.getProperty("logfile","troggie.log"))
@@ -70,10 +70,10 @@ class Troggie(network: String) extends PircBot with Actor {
   }
   
   def receive = {
-  	case s: SendMessage => {
-  		if(s.count) sentMsgs += 1
-  		sendMessage(s.target, s.msg)
-  	}
+    case s: SendMessage => {
+      if(s.count) sentMsgs += 1
+      sendMessage(s.target, s.msg)
+    }
     case _ => log("unknown msg")
   }
   
@@ -81,10 +81,10 @@ class Troggie(network: String) extends PircBot with Actor {
   val launchTime = currentTime
   val periodFormatter = PeriodFormat.getDefault()
   def doStatus(from: String, msg: String) {
-  	if(StatusRE.pattern.matcher(msg).matches) {
-    		val period = periodFormatter.print(new Period(launchTime, currentTime))
-    		self ! SendMessage(from, "Uptime: %s. Messages in/out: %d/%d."
-    				format(period, recdMsgs, sentMsgs), true)
+    if(StatusRE.pattern.matcher(msg).matches) {
+        val period = periodFormatter.print(new Period(launchTime, currentTime))
+        self ! SendMessage(from, "Uptime: %s. Messages in/out: %d/%d."
+            format(period, recdMsgs, sentMsgs), true)
     }
   }
 
@@ -115,13 +115,13 @@ class Troggie(network: String) extends PircBot with Actor {
   }
   
   override def onMessage(channel: String, sender: String, login: String, host: String, msg: String) {
-  	recdMsgs += 1
-  	doStatus(channel, msg)
+    recdMsgs += 1
+    doStatus(channel, msg)
     router ! Message(channel, sender, login, host, msg)
   }
   
   override def onPrivateMessage(sender: String, login: String, host: String, msg: String) {
-  	recdMsgs += 1
+    recdMsgs += 1
     doStatus(sender, msg)
     router ! PrivateMessage(sender, login, host, msg)
   }
