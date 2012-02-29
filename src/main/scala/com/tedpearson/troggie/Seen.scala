@@ -1,14 +1,14 @@
 package com.tedpearson.troggie
-import DbAccess._
 import org.scalaquery.ql.basic.BasicTable
 import java.sql.Timestamp
 import org.scalaquery.meta.MTable
-import org.scalaquery.ql.basic.BasicDriver.Implicit._
+import org.scalaquery.ql.extended.SQLiteDriver.Implicit._
 import org.scalaquery.ql.TypeMapper._
 import org.scalaquery.ql._
 import org.scalaquery.session.Session
 import scala.compat.Platform.currentTime
-
+import org.scalaquery.ql.extended.ExtendedTable
+      
 class Seen(conf: PluginConf) extends Plugin(conf) {
   implicit val session: Session = conf.session
   setupDb
@@ -16,7 +16,7 @@ class Seen(conf: PluginConf) extends Plugin(conf) {
   protected def processMessage(message: IrcMessage) {
     message match {
     	case j: Join => updateDb(j.sender, "joining the channel", j.channel)
-    	case m: Message => updateDb(m.sender, "saying", m.channel, Some(m.msg))
+    	case m: Message => updateDb(m.sender, "saying: '%s'" format m.msg, m.channel, saying = Some(m.msg))
     	case _ =>
     }
   }
@@ -25,8 +25,28 @@ class Seen(conf: PluginConf) extends Plugin(conf) {
   	if(MTable.getTables.firstOption.isEmpty) SeenTable.ddl.create
   }
   
-  private object SeenTable extends BasicTable[(Int, String, Timestamp, String, String, Option[String], Option[Timestamp])]("TROGGIE_SEEN") {
-    def id = column[Int]("id", O PrimaryKey)
+
+  private def updateDb(nick: String, doing: String, channel: String, saying: Option[String] = None) {
+  	println(saying)
+  	val row = for(s <- SeenTable if s.nick is nick)
+  	  yield s.nick ~ s.time ~ s.doing ~ s.channel ~ s.saying ~ s.saying_time
+    val time = new Timestamp(currentTime)
+  	val sTime = if(saying.isDefined) Some(time) else None
+  	row.firstOption match {
+  		case Some(r) => {
+  			if(saying.isDefined) row.update((nick, time, doing, channel, saying, sTime))
+  			else row.update((nick, time, doing, channel, r._5, r._6))
+  		}
+  		case None => {
+  		  SeenTable.all insert {
+  		    (nick, time, doing, channel, saying, sTime)
+  		  }
+  		}
+  	}
+  }
+  
+  private object SeenTable extends ExtendedTable[(Int, String, Timestamp, String, String, Option[String], Option[Timestamp])]("TROGGIE_SEEN") {
+    def id = column[Int]("id", O PrimaryKey, O AutoInc)
     def nick = column[String]("nick", O DBType("text"))
     def time = column[Timestamp]("time")
     def doing = column[String]("doing", O DBType("text"))
@@ -35,17 +55,6 @@ class Seen(conf: PluginConf) extends Plugin(conf) {
     def saying_time = column[Option[Timestamp]]("saying_time")
     def nick_index = index("nick_index", nick)
     def * = id ~ nick ~ time ~ doing ~ channel ~ saying ~ saying_time
-  }
-  
-  private def updateDb(doing: String, channel: String, nick: String, saying: Option[String] = None) {
-    println("UPDATE" + nick)
-  	val row = for(s <- SeenTable if s.nick is nick) yield s
-    val time = new Timestamp(currentTime)
-    val sTime = if(saying.isDefined) Some(time) else None
-  	if(row.firstOption.isDefined) 
-  		row.update((0, nick, time, doing, channel, saying, sTime))
-  	else
-  		SeenTable insert (0, nick, time, doing, channel, saying, sTime)
+    def all = nick ~ time ~ doing ~ channel ~ saying ~ saying_time
   }
 }
-
