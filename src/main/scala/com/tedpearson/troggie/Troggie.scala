@@ -126,8 +126,8 @@ class Troggie(network: String) extends PircBot with Actor {
     router ! PrivateMessage(sender, login, host, msg)
   }
   
-  override def onAction(channel: String, sender: String, login: String, host: String, msg: String) {
-    router ! Action(channel, sender, login, host, msg)
+  override def onAction(sender: String, login: String, host: String, target: String, action: String) {
+    router ! Action(sender, login, host, target, action)
   }
   
   override def onDeop(channel: String, sender: String, login: String, host: String, rcpt: String) {
