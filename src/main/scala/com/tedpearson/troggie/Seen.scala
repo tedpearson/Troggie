@@ -21,7 +21,7 @@ class Seen(conf: PluginConf) extends Plugin(conf) {
       case m: Action => {
         if(m.target.startsWith("#")) {
           val saying = "*%s %s" format (m.sender, m.action)
-          updateDb(m.sender, "saying: '%s'" format saying, m.action, saying = Some(saying));
+          updateDb(m.sender, "saying: '%s'" format saying, m.target, saying = Some(saying));
         }
       }
       case _ =>

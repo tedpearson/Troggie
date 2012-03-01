@@ -32,7 +32,10 @@ class SeenTest extends FlatSpec with BeforeAndAfter with ShouldMatchers with Moc
     val line = getLine("Burni")
     line match {
       case (id, "Burni", a, "joining the channel", "#ignmac", c, d) => 
+        id should equal (1)
+        a.getTime() should be > (0L)
         c.isDefined should be (false)
+        d.isDefined should be (false)
       case _ => error(line.toString)
     }
   }
@@ -41,7 +44,9 @@ class SeenTest extends FlatSpec with BeforeAndAfter with ShouldMatchers with Moc
     impl.processMessage(Message("#ignmac", "Burni", e, e, "This is a test"))
     var line = getLine("Burni")
     line match {
-      case (id, "Burni", a, "saying: 'This is a test'", b, Some("This is a test"), c) =>
+      case (id, "Burni", a, "saying: 'This is a test'", "#ignmac", Some("This is a test"), c) =>
+        id should equal (1)
+        a.getTime() should be > (0L)
         c.isDefined should be (true)
       case _ => error(line.toString)
     }
@@ -51,7 +56,9 @@ class SeenTest extends FlatSpec with BeforeAndAfter with ShouldMatchers with Moc
     impl.processMessage(Action("Burni", e, e, "#ignmac", "This is a test"))
     var line = getLine("Burni")
     line match {
-      case (id, "Burni", a, "saying: '*Burni This is a test'", b, Some("*Burni This is a test"), c) =>
+      case (id, "Burni", a, "saying: '*Burni This is a test'", "#ignmac", Some("*Burni This is a test"), c) =>
+        id should equal(1)
+        a.getTime() should be > (0L)
         c.isDefined should be (true)
       case _ => error(line.toString)
     }
