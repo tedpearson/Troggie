@@ -23,4 +23,3 @@ nice quit message
   * UrlTitle
   * Seen
   * Factoid
-* do we really need the extended driver? try without autoinc

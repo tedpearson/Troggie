@@ -71,10 +71,11 @@ class Troggie(network: String) extends PircBot with Actor {
   
   def receive = {
     case s: SendMessage => {
+      println("hi")
       if(s.count) sentMsgs += 1
       sendMessage(s.target, s.msg)
     }
-    case _ => log("unknown msg")
+    case _ => println("unknown message")
   }
   
   val StatusRE = """(?i)^\s*status\s*\?*$""".r
@@ -117,7 +118,7 @@ class Troggie(network: String) extends PircBot with Actor {
   override def onMessage(channel: String, sender: String, login: String, host: String, msg: String) {
     recdMsgs += 1
     doStatus(channel, msg)
-    router ! Message(channel, sender, login, host, msg)
+    router ! PublicMessage(channel, sender, login, host, msg)
   }
   
   override def onPrivateMessage(sender: String, login: String, host: String, msg: String) {

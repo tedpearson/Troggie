@@ -5,8 +5,16 @@ sealed trait TroggieMessage
 
 sealed trait IrcMessage extends TroggieMessage
 
-case class Message(channel: String, sender: String, login: String, host: String, msg: String) extends IrcMessage
-case class PrivateMessage(sender: String, login: String, host: String, msg: String) extends IrcMessage
+trait Message extends IrcMessage {
+  val sender: String
+  val login: String
+  val host: String
+  val msg: String
+}
+case class PublicMessage(channel: String, sender: String, login: String, host: String, msg: String) 
+  extends Message
+case class PrivateMessage(sender: String, login: String, host: String, msg: String)
+  extends Message
 case class Action(sender: String, login: String, host: String, target: String, action: String) extends IrcMessage
 case class Deop(channel: String, sender: String, login: String, host: String, rcpt: String) extends IrcMessage
 case class DeVoice(channel: String, sender: String, login: String, host: String, rcpt: String) extends IrcMessage
