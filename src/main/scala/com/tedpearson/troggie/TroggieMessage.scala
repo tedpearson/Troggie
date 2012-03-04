@@ -4,8 +4,11 @@ import org.jibble.pircbot.User
 sealed trait TroggieMessage
 
 sealed trait IrcMessage extends TroggieMessage
+sealed abstract class NickMessage extends IrcMessage {
+  val sender: String
+}
 
-trait Message extends IrcMessage {
+sealed abstract class Message extends NickMessage {
   val sender: String
   val login: String
   val host: String
@@ -15,18 +18,18 @@ case class PublicMessage(channel: String, sender: String, login: String, host: S
   extends Message
 case class PrivateMessage(sender: String, login: String, host: String, msg: String)
   extends Message
-case class Action(sender: String, login: String, host: String, target: String, action: String) extends IrcMessage
-case class Deop(channel: String, sender: String, login: String, host: String, rcpt: String) extends IrcMessage
-case class DeVoice(channel: String, sender: String, login: String, host: String, rcpt: String) extends IrcMessage
-case class Join(channel: String, sender: String, login: String, host: String) extends IrcMessage
-case class Kick(channel: String, sender: String, login: String, host: String, rcpt: String, msg: String) extends IrcMessage
-case class NickChange(oldNick: String, login: String, host: String, newNick: String)
-case class Notice(sender: String, login: String, host: String, target: String, msg: String) extends IrcMessage
-case class Op(channel: String, sender: String, login: String, host: String, rcpt: String) extends IrcMessage
-case class Part(channel: String, sender: String, login: String, host: String) extends IrcMessage
-case class Quit(sender: String, login: String, host: String, msg: String) extends IrcMessage
-case class Topic(channel: String, topic: String, setBy: String, date: Long, change: Boolean) extends IrcMessage
-case class Voice(channel: String, sender: String, login: String, host: String, rcpt: String) extends IrcMessage
+case class Action(sender: String, login: String, host: String, target: String, action: String) extends NickMessage
+case class Deop(channel: String, sender: String, login: String, host: String, rcpt: String) extends NickMessage
+case class DeVoice(channel: String, sender: String, login: String, host: String, rcpt: String) extends NickMessage
+case class Join(channel: String, sender: String, login: String, host: String) extends NickMessage
+case class Kick(channel: String, sender: String, login: String, host: String, rcpt: String, msg: String) extends NickMessage
+case class NickChange(sender: String, login: String, host: String, newNick: String) extends NickMessage
+case class Notice(sender: String, login: String, host: String, target: String, msg: String) extends NickMessage
+case class Op(channel: String, sender: String, login: String, host: String, rcpt: String) extends NickMessage
+case class Part(channel: String, sender: String, login: String, host: String) extends NickMessage
+case class Quit(sender: String, login: String, host: String, msg: String) extends NickMessage
+case class Topic(channel: String, topic: String, sender: String, date: Long, change: Boolean) extends NickMessage
+case class Voice(channel: String, sender: String, login: String, host: String, rcpt: String) extends NickMessage
 case class SelfJoin(channel: String) extends IrcMessage
 case class UserList(users: Array[User]) extends IrcMessage
 case class SelfNickChange(oldNick: String, login: String, host: String, newNick: String) extends IrcMessage

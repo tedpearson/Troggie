@@ -26,6 +26,7 @@ class Troggie(network: String) extends PircBot with Actor {
   val log = new BufferedWriter(new FileWriter(logfile, true))
   setVerbose(true)
   val nick = properties.getProperty("nick")
+  val Ignore = Option(properties.getProperty("ignore")) map { _.replace(",","|").replace("*",".*?").r }
   setName(nick)
   setLogin(nick)
   setEncoding("UTF-8")
@@ -73,7 +74,6 @@ class Troggie(network: String) extends PircBot with Actor {
   
   def receive = {
     case s: SendMessage => {
-      println("hi")
       if(s.count) sentMsgs += 1
       sendMessage(s.target, s.msg)
     }
@@ -88,6 +88,20 @@ class Troggie(network: String) extends PircBot with Actor {
         self ! SendMessage(from, "Uptime: %s. Messages in/out: %d/%d."
             format(period, recdMsgs, sentMsgs), true)
     }
+  }
+  
+  def send(msg: IrcMessage) {
+    Ignore match {
+      case Some(r) => msg match {
+        case m: Message => "%s!%s@%s".format(m.sender, m.login, m.host) match {
+          case `r`() => return
+          case _ =>
+        }
+        case _ =>
+      }
+      case _ =>
+    }
+    router ! msg
   }
 
   override def log(line: String) {
@@ -119,33 +133,33 @@ class Troggie(network: String) extends PircBot with Actor {
   override def onMessage(channel: String, sender: String, login: String, host: String, msg: String) {
     recdMsgs += 1
     doStatus(channel, msg)
-    router ! PublicMessage(channel, sender, login, host, msg)
+    send(PublicMessage(channel, sender, login, host, msg))
   }
   
   override def onPrivateMessage(sender: String, login: String, host: String, msg: String) {
     recdMsgs += 1
     doStatus(sender, msg)
-    router ! PrivateMessage(sender, login, host, msg)
+    send(PrivateMessage(sender, login, host, msg))
   }
   
   override def onAction(sender: String, login: String, host: String, target: String, action: String) {
-    router ! Action(sender, login, host, target, action)
+    send(Action(sender, login, host, target, action))
   }
   
   override def onDeop(channel: String, sender: String, login: String, host: String, rcpt: String) {
-    router ! Deop(channel, sender, login, host, rcpt)
+    send(Deop(channel, sender, login, host, rcpt))
   }
   
   override def onDeVoice(channel: String, sender: String, login: String, host: String, rcpt: String) {
-    router ! DeVoice(channel, sender, login, host, rcpt)
+    send(DeVoice(channel, sender, login, host, rcpt))
   }
   
   override def onJoin(channel: String, sender: String, login: String, hostname: String) {
     sender match {
       // backticks required with lowercase variable here
       // otherwise it will assume we're declaring a new variable to bind on match
-      case `nick` => router ! SelfJoin(channel)
-      case _ => router ! Join(channel, sender, login, hostname)
+      case `nick` => send(SelfJoin(channel))
+      case _ => send(Join(channel, sender, login, hostname))
     }
   }
   
@@ -157,38 +171,38 @@ class Troggie(network: String) extends PircBot with Actor {
       }
       case _ =>
     }
-    router ! Kick(channel, sender, login, host, rcpt, msg)
+    send(Kick(channel, sender, login, host, rcpt, msg))
   }
   
   override def onNickChange(oldNick: String, login: String, host: String, newNick: String) {
     oldNick match {
-      case `nick` => router ! SelfNickChange(oldNick, login, host, newNick)
-      case _ => router ! NickChange(oldNick, login, host, newNick)
+      case `nick` => send(SelfNickChange(oldNick, login, host, newNick))
+      case _ => send(NickChange(oldNick, login, host, newNick))
     }
   }
   
   override def onNotice(sender: String, login: String, host: String, target: String, msg: String) {
-    router ! Notice(sender, login, host, target, msg)
+    send(Notice(sender, login, host, target, msg))
   }
   
   override def onOp(channel: String, sender: String, login: String, host: String, rcpt: String) {
-    router ! Op(channel, sender, login, host, rcpt)
+    send(Op(channel, sender, login, host, rcpt))
   }
   
   override def onPart(channel: String, sender: String, login: String, host: String) {
-    router ! Part(channel, sender, login, host)
+    send(Part(channel, sender, login, host))
   }
   
   override def onQuit(sender: String, login: String, host: String, msg: String) {
-    router ! Quit(sender, login, host, msg)
+    send(Quit(sender, login, host, msg))
   }
   
   override def onTopic(channel: String, topic: String, setBy: String, date: Long, change: Boolean) {
-    router ! Topic(channel, topic, setBy, date, change)
+    send(Topic(channel, topic, setBy, date, change))
   }
   
   override def onVoice(channel: String, sender: String, login: String, host: String, rcpt: String) {
-    router ! Voice(channel, sender, login, host, rcpt)
+    send(Voice(channel, sender, login, host, rcpt))
   }
 }
 

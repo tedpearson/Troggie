@@ -44,8 +44,8 @@ class Seen(conf: PluginConf) extends Plugin(conf) {
         db ! Update(m.rcpt, "being kicked off %s" format m.channel, Some(m.channel), false)
       }
       case m: NickChange => {
-        db ! Update(m.oldNick, "changing their nick to '%s'" format m.newNick, None, false)
-        db ! Update(m.newNick, "changint their nick from '%s'" format m.oldNick, None, false)
+        db ! Update(m.sender, "changing their nick to '%s'" format m.newNick, None, false)
+        db ! Update(m.newNick, "changint their nick from '%s'" format m.sender, None, false)
       }
       case m: Notice => {
         if(m.target.startsWith("#")) {
@@ -54,7 +54,7 @@ class Seen(conf: PluginConf) extends Plugin(conf) {
       }
       case m: Part => db ! Update(m.sender, "leaving the channel" format m.channel, Some(m.channel), false)
       case m: Quit => db ! Update(m.sender, "quitting (%s)" format m.msg, None, false)
-      case m: Topic => db ! Update(m.setBy, "changing the topic to '%s'" format m.topic, Some(m.channel), false)
+      case m: Topic => db ! Update(m.sender, "changing the topic to '%s'" format m.topic, Some(m.channel), false)
       case m: PrivateMessage => matchMessage(m)
       case _ =>
     }
