@@ -14,6 +14,8 @@ import scala.compat.Platform._
 import org.joda.time.format.PeriodFormat
 import org.joda.time.Period
 import org.scalaquery.session.Database
+import org.joda.time.PeriodType
+import org.joda.time.format.PeriodFormatterBuilder
 
 class Troggie(network: String) extends PircBot with Actor {
   var (sentMsgs, recdMsgs) = (0L, 0L)
@@ -80,10 +82,9 @@ class Troggie(network: String) extends PircBot with Actor {
   
   val StatusRE = """(?i)^\s*status\s*\?*$""".r
   val launchTime = currentTime
-  val periodFormatter = PeriodFormat.getDefault()
   def doStatus(from: String, msg: String) {
     if(StatusRE.pattern.matcher(msg).matches) {
-        val period = periodFormatter.print(new Period(launchTime, currentTime))
+        val period = Utils.formatSince(launchTime, currentTime)
         self ! SendMessage(from, "Uptime: %s. Messages in/out: %d/%d."
             format(period, recdMsgs, sentMsgs), true)
     }
@@ -231,5 +232,33 @@ object Troggie extends App {
       try { Thread.sleep(1000) } catch { case _: InterruptedException => () }
     }
     system.shutdown()
+  }
+}
+
+object Utils {
+  val p = new PeriodFormatterBuilder()
+  .appendYears()
+  .appendSuffix(" year"," years")
+  .appendSeparator(", ")
+  .appendMonths().appendSuffix(" month, ","months, ")
+  .appendSeparator(", ")
+  .appendWeeks()
+  .appendSuffix(" week"," weeks")
+  .appendSeparator(", ")
+  .appendDays()
+  .appendSuffix(" day"," days")
+  .appendSeparator(", ")
+  .appendHours()
+  .appendSuffix(" hour"," hours")
+  .appendSeparator(", ")
+  .appendMinutes()
+  .appendSuffix(" minute"," minutes")
+  .appendSeparator(", ")
+  .printZeroAlways()
+  .appendSeconds()
+  .appendSuffix(" second"," seconds")
+  .toFormatter()
+  def formatSince(start: Long, end: Long) = {
+    p.print(new Period(start, end))
   }
 }
