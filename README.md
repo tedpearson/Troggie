@@ -17,9 +17,8 @@ Development TODO list:
 
 * handle shutdown nicely (ctrl-c as well as shutdown from within sbt) - have a
 nice quit message
-* implement ignore list. possibly in the router? subclass it?
-* finish Seen plugin implementation
 * implement important or working plugins in Java version before releasing beta:
   * UrlTitle
-  * Seen
   * Factoid
+* implement plugin status messages
+* default TZ for seen plugin

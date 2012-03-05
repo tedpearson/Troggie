@@ -45,7 +45,7 @@ class Seen(conf: PluginConf) extends Plugin(conf) {
       }
       case m: NickChange => {
         db ! Update(m.sender, "changing their nick to '%s'" format m.newNick, None, false)
-        db ! Update(m.newNick, "changint their nick from '%s'" format m.sender, None, false)
+        db ! Update(m.newNick, "changing their nick from '%s'" format m.sender, None, false)
       }
       case m: Notice => {
         if(m.target.startsWith("#")) {
@@ -75,11 +75,11 @@ class Seen(conf: PluginConf) extends Plugin(conf) {
             val niceTime = formatter.print(new DateTime(time))
             troggie ! SendMessage(target, "%s was last seen %s%s ago, %s %s"
                 .format (nick, chan, since, doing, niceTime), doCount)
-            if(time != saying_time.get) {
+            if(saying_time exists {_ == time}) {
               val niceSaying = formatter.print(new DateTime(saying_time.get))
               val since = Utils.formatSince(saying_time.get.getTime, currentTime)
               troggie ! SendMessage(target, "%s last spoke %s%s ago, %s %s"
-                  .format (nick, chan, time, saying.get, niceSaying), doCount)
+                  .format (nick, chan, since, saying.get, niceSaying), doCount)
             }
           }
         }
