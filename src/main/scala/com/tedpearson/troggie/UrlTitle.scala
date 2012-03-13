@@ -15,11 +15,13 @@ class UrlTitle(conf: PluginConf) extends Plugin(conf) {
     message match {
       case m: Action => getUrlTitle(m.action, m.target, m.sender)
       case m: PublicMessage => getUrlTitle(m.msg, m.channel, m.sender)
-      case _ =>
+      case m: GetStatus => getStatus
+      case _ => 
     }
   }
   
-  def getStatus = " Urls retrieved: %d."
+  var count = 0
+  def getStatus = sender ! Status(" Urls retrieved: %d." format count)
   
   val Url = """(https?://[^ ]+)""".r
   private def getUrlTitle(msg: String, target: String, sender: String): Unit = msg match {
@@ -45,6 +47,7 @@ class UrlTitle(conf: PluginConf) extends Plugin(conf) {
               case _ =>
             }
             override def handleText(data: Array[Char], pos: Int): Unit = if(foundTitle) {
+              count += 1
               troggie ! SendMessage(target, "[ %s ]" format new String(data), true)
             }
           }, true)

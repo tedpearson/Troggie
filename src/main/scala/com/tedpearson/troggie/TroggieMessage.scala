@@ -33,6 +33,7 @@ case class Voice(channel: String, sender: String, login: String, host: String, r
 case class SelfJoin(channel: String) extends IrcMessage
 case class UserList(users: Array[User]) extends IrcMessage
 case class SelfNickChange(oldNick: String, login: String, host: String, newNick: String) extends IrcMessage
+case class GetStatus() extends IrcMessage
 
 
 sealed trait PluginMessage extends TroggieMessage
@@ -42,4 +43,5 @@ case class SendNotice(target: String, notice: String) extends PluginMessage
 case class SendAction(target: String, msg: String) extends PluginMessage
 case class GetUsers(channel: String) extends PluginMessage
 case class VoiceUser(channel: String, user: String) extends PluginMessage
-case class Log(msg: String)
+case class Log(msg: String) extends PluginMessage
+case class Status(status: String) extends PluginMessage

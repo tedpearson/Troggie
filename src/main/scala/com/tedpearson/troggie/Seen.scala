@@ -1,9 +1,7 @@
 package com.tedpearson.troggie
 import java.sql.Timestamp
 import java.util.Date
-
 import scala.compat.Platform.currentTime
-
 import org.joda.time.format.DateTimeFormat
 import org.joda.time.DateTime
 import org.scalaquery.meta.MTable
@@ -13,7 +11,6 @@ import org.scalaquery.ql.basic.{BasicTable => Table}
 import org.scalaquery.ql.Column
 import org.scalaquery.ql.SimpleFunction
 import org.scalaquery.session.Session
-
 import akka.actor.{Props, Actor}
 import akka.pattern.ask
 import akka.util.Timeout
@@ -56,6 +53,7 @@ class Seen(conf: PluginConf) extends Plugin(conf) {
       case m: Quit => db ! Update(m.sender, "quitting (%s)" format m.msg, None, false)
       case m: Topic => db ! Update(m.sender, "changing the topic to '%s'" format m.topic, Some(m.channel), false)
       case m: PrivateMessage => matchMessage(m)
+      case m: GetStatus => sender ! Status("")
       case _ =>
     }
   }

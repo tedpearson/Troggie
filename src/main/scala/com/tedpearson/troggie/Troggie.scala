@@ -10,12 +10,16 @@ import java.util.Properties
 import org.jibble.pircbot.PircBot
 import akka.actor._
 import akka.routing.BroadcastRouter
+import akka.pattern.ask
 import scala.compat.Platform._
 import org.joda.time.format.PeriodFormat
 import org.joda.time.Period
 import org.scalaquery.session.Database
 import org.joda.time.PeriodType
 import org.joda.time.format.PeriodFormatterBuilder
+import akka.dispatch.Future
+import akka.util.Timeout
+import akka.dispatch.Await
 
 class Troggie(network: String) extends PircBot with Actor {
   var (sentMsgs, recdMsgs) = (0L, 0L)
@@ -33,7 +37,9 @@ class Troggie(network: String) extends PircBot with Actor {
   val port = Integer.parseInt(properties.getProperty("port", "6667"))
   val database = properties.getProperty("database")
   val session = Database.forURL("jdbc:sqlite:%s" format database, driver = "org.sqlite.JDBC").createSession()
-  val router = loadPlugins
+  val plugins = loadPlugins
+  val router = context.actorOf(Props[Plugin].withRouter(BroadcastRouter(routees = plugins)), name="router")
+  implicit val system = context.system
   
   // don't connect until actor is started
   // otherwise we try to start sending messages before akka is ready
@@ -54,12 +60,11 @@ class Troggie(network: String) extends PircBot with Actor {
     }
   }
   
-  private def loadPlugins: ActorRef = {
+  private def loadPlugins: Seq[ActorRef] = {
     val conf = new PluginConf(properties, session)
-    val active = for(plugin <- properties.getProperty("plugins").split(",") if pluginDefined(plugin))
-      yield context.actorOf(Props(
-          Class.forName(plugin).getConstructor(classOf[PluginConf]).newInstance(conf).asInstanceOf[Plugin]), name=plugin)
-    context.actorOf(Props[Plugin].withRouter(BroadcastRouter(routees = active)), name="router")
+    for(plugin <- properties.getProperty("plugins").split(",") if pluginDefined(plugin))
+      yield context.actorOf(Props(Class.forName(plugin).getConstructor(
+          classOf[PluginConf]).newInstance(conf).asInstanceOf[Plugin]), name=plugin)
   }
   
   private def pluginDefined(plugin: String) = {
@@ -73,20 +78,28 @@ class Troggie(network: String) extends PircBot with Actor {
   }
   
   def receive = {
-    case s: SendMessage => {
-      if(s.count) sentMsgs += 1
-      sendMessage(s.target, s.msg)
+    case m: SendMessage => {
+      if(m.count) sentMsgs += 1
+      sendMessage(m.target, m.msg)
     }
     case _ => println("unknown message")
   }
   
   val StatusRE = """(?i)^\s*status\s*\?*$""".r
   val launchTime = currentTime
+  import akka.util.duration._
+  implicit val timeout = Timeout(500 milliseconds)
   def doStatus(from: String, msg: String) {
     if(StatusRE.pattern.matcher(msg).matches) {
-        val period = Utils.formatSince(launchTime, currentTime)
-        self ! SendMessage(from, "Uptime: %s. Messages in/out: %d/%d."
-            format(period, recdMsgs, sentMsgs), true)
+      val period = Utils.formatSince(launchTime, currentTime)
+      val futures = for(p <- plugins) yield (p ? GetStatus()).mapTo[Status]
+      Future {
+        val fList = Future.sequence(futures.map(_ recover { case _ => Status("") }))
+        val result = Await.result(fList, Timeout(1 second).duration).filter(_.status != "")
+        val status = for (s <- result) yield s.status
+        self ! SendMessage(from, "Uptime: %s. Messages in/out: %d/%d. %s"
+          format(period, recdMsgs, sentMsgs, status.mkString(""," ","")), true)
+      }
     }
   }
   
