@@ -1,9 +1,9 @@
 package com.tedpearson.troggie
 import java.util.Properties
-
 import org.scalaquery.session.Session
-
 import akka.actor._
+import org.scalaquery.meta.MTable
+import org.scalaquery.ql.basic.BasicTable
 
 abstract class Plugin(conf: PluginConf) extends Actor {
   def getStatusString = ""
@@ -12,6 +12,9 @@ abstract class Plugin(conf: PluginConf) extends Actor {
     case _ => // we don't handle other messages.
   }
   protected def processMessage(m: IrcMessage): Unit
+  protected def tableExists [T] (table: BasicTable[T])(implicit session: Session): Boolean = {
+    MTable.getTables.list.map(_.name.name).contains(table.tableName)
+  }
 }
 
 case class PluginConf(p: Properties, session: Session) {}
