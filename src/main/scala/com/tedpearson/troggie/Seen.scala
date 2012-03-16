@@ -22,40 +22,38 @@ class Seen(conf: PluginConf) extends Plugin(conf) {
   val formatter = DateTimeFormat.forPattern("[EEE MMM d, HH:mm:ss yyyy z]")
   db ! Setup
   
-  def processMessage(message: IrcMessage) {
-    message match {
-      case m: Join => db ! Update(m.sender, "joining the channel", Some(m.channel), false)
-      case m: PublicMessage => {
-        matchMessage(m)
-        val msg = "saying: '%s'" format m.msg
-        db ! Update(m.sender, msg, Some(m.channel), true)
-      }
-      case m: Action => {
-        if(m.target.startsWith("#")) {
-          val msg = "saying: '*%s %s'" format(m.sender, m.action)
-          db ! Update(m.sender, msg, Some(m.target), true)
-        }
-      }
-      case m: Kick => {
-        db ! Update(m.sender, "kicking %s off %s" format (m.rcpt, m.channel), Some(m.channel), false)
-        db ! Update(m.rcpt, "being kicked off %s" format m.channel, Some(m.channel), false)
-      }
-      case m: NickChange => {
-        db ! Update(m.sender, "changing their nick to '%s'" format m.newNick, None, false)
-        db ! Update(m.newNick, "changing their nick from '%s'" format m.sender, None, false)
-      }
-      case m: Notice => {
-        if(m.target.startsWith("#")) {
-          db ! Update(m.sender, "making a notice: '%s'" format m.msg, Some(m.target), false)
-        }
-      }
-      case m: Part => db ! Update(m.sender, "leaving the channel" format m.channel, Some(m.channel), false)
-      case m: Quit => db ! Update(m.sender, "quitting (%s)" format m.msg, None, false)
-      case m: Topic => db ! Update(m.sender, "changing the topic to '%s'" format m.topic, Some(m.channel), false)
-      case m: PrivateMessage => matchMessage(m)
-      case m: GetStatus => sender ! Status("")
-      case _ =>
+  def processMessage(message: IrcMessage) = message match {
+    case m: Join => db ! Update(m.sender, "joining the channel", Some(m.channel), false)
+    case m: PublicMessage => {
+      matchMessage(m)
+      val msg = "saying: '%s'" format m.msg
+      db ! Update(m.sender, msg, Some(m.channel), true)
     }
+    case m: Action => {
+      if(m.target.startsWith("#")) {
+        val msg = "saying: '*%s %s'" format(m.sender, m.action)
+        db ! Update(m.sender, msg, Some(m.target), true)
+      }
+    }
+    case m: Kick => {
+      db ! Update(m.sender, "kicking %s off %s" format (m.rcpt, m.channel), Some(m.channel), false)
+      db ! Update(m.rcpt, "being kicked off %s" format m.channel, Some(m.channel), false)
+    }
+    case m: NickChange => {
+      db ! Update(m.sender, "changing their nick to '%s'" format m.newNick, None, false)
+      db ! Update(m.newNick, "changing their nick from '%s'" format m.sender, None, false)
+    }
+    case m: Notice => {
+      if(m.target.startsWith("#")) {
+        db ! Update(m.sender, "making a notice: '%s'" format m.msg, Some(m.target), false)
+      }
+    }
+    case m: Part => db ! Update(m.sender, "leaving the channel" format m.channel, Some(m.channel), false)
+    case m: Quit => db ! Update(m.sender, "quitting (%s)" format m.msg, None, false)
+    case m: Topic => db ! Update(m.sender, "changing the topic to '%s'" format m.topic, Some(m.channel), false)
+    case m: PrivateMessage => matchMessage(m)
+    case m: GetStatus => sender ! Status("")
+    case _ =>
   }
   
   val SeenQuery = """(?i)seen ([\S]+).*""".r
@@ -90,9 +88,7 @@ class Seen(conf: PluginConf) extends Plugin(conf) {
     val lower = SimpleFunction[String]("lower")
     def lower2(c: Column[String]) = lower(Seq(c))
     def receive = {
-      case Setup => {
-        if(MTable.getTables.firstOption.isEmpty) SeenTable.ddl.create
-      }
+      case Setup => createIfNotExists(SeenTable)
       case Update(nick, doing, channel, isSaying) => {
         val row = for(s <- SeenTable if s.nick is nick)
           yield s.all
@@ -123,7 +119,7 @@ class Seen(conf: PluginConf) extends Plugin(conf) {
   case class Find(nick: String)
   case class Saw(nick: String, time: Date, doing: String, channel: Option[String],
       saying: Option[String], saying_time: Option[Date])
-  object Setup
+  case object Setup
   
   object SeenTable extends Table[(Int, String, Timestamp, String, Option[String], Option[String], Option[Timestamp])]("TROGGIE_SEEN") {
     def id = column[Int]("id", O PrimaryKey)

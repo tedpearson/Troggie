@@ -11,13 +11,11 @@ import akka.dispatch.Future
 class UrlTitle(conf: PluginConf) extends Plugin(conf) {
   val troggie = context.actorFor("..")
   implicit val system = context.system
-  protected def processMessage(message: IrcMessage): Unit = {
-    message match {
-      case m: Action => getUrlTitle(m.action, m.target, m.sender)
-      case m: PublicMessage => getUrlTitle(m.msg, m.channel, m.sender)
-      case m: GetStatus => getStatus
-      case _ => 
-    }
+  protected def processMessage(message: IrcMessage): Unit = message match {
+    case m: Action => getUrlTitle(m.action, m.target, m.sender)
+    case m: PublicMessage => getUrlTitle(m.msg, m.channel, m.sender)
+    case m: GetStatus => getStatus
+    case _ => 
   }
   
   var count = 0
