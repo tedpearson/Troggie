@@ -86,13 +86,10 @@ class Seen(conf: PluginConf) extends Plugin(conf) {
   }
   
   class SeenDb(implicit session: Session) extends Actor {
-    val lower = SimpleFunction[String]("lower")
-    def lower2(c: Column[String]) = lower(Seq(c))
     def receive = {
       case Setup => createIfNotExists(SeenTable)
       case Update(nick, doing, channel, isSaying) => {
-        val row = for(s <- SeenTable if s.nick is nick)
-          yield s.all
+        val row = for(s <- SeenTable if s.nick is nick) yield s.all
         val time = new Timestamp(currentTime)
         val sTime = if(isSaying) Some(time) else None
         val saying = if(isSaying) Some(doing) else None
@@ -105,7 +102,7 @@ class Seen(conf: PluginConf) extends Plugin(conf) {
         }
       }
       case Find(nick) => {
-        val find = for(s <- SeenTable if lower2(s.nick) === nick) yield s.all
+        val find = for(s <- SeenTable if lowerc(s.nick) === lowers(nick)) yield s.all
         find.firstOption match {
           case Some((nick, time, doing, channel, saying, saying_time)) => {
             sender ! Saw(nick, time, doing, channel, saying, saying_time)
