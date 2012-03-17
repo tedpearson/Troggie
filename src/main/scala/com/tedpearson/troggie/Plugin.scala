@@ -6,9 +6,12 @@ import org.scalaquery.meta.MTable
 import org.scalaquery.ql.basic.BasicTable
 import org.scalaquery.ql.basic.BasicDriver.Implicit._
 
+
 abstract class Plugin(conf: PluginConf) extends Actor {
-  def getStatusString = ""
+  val troggie = context.actorFor("..")
+  protected def getStatusString: String
   def receive = {
+    case m: GetStatus => sender ! Status(getStatusString)
     case m: IrcMessage => processMessage(m)
     case _ => // we don't handle other messages.
   }

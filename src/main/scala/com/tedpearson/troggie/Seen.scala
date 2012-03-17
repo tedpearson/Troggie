@@ -17,10 +17,11 @@ import akka.util.Timeout
 
 class Seen(conf: PluginConf) extends Plugin(conf) {
   implicit val session: Session = conf.session
-  val troggie = context.actorFor("..")
   var db = context.actorOf(Props(new SeenDb()))
   val formatter = DateTimeFormat.forPattern("[EEE MMM d, HH:mm:ss yyyy z]")
   db ! Setup
+  
+  override protected def getStatusString = ""
   
   def processMessage(message: IrcMessage) = message match {
     case m: Join => db ! Update(m.sender, "joining the channel", Some(m.channel), false)
@@ -52,7 +53,6 @@ class Seen(conf: PluginConf) extends Plugin(conf) {
     case m: Quit => db ! Update(m.sender, "quitting (%s)" format m.msg, None, false)
     case m: Topic => db ! Update(m.sender, "changing the topic to '%s'" format m.topic, Some(m.channel), false)
     case m: PrivateMessage => matchMessage(m)
-    case m: GetStatus => sender ! Status("")
     case _ =>
   }
   
@@ -71,7 +71,8 @@ class Seen(conf: PluginConf) extends Plugin(conf) {
             val niceTime = formatter.print(new DateTime(time))
             troggie ! SendMessage(target, "%s was last seen %s%s ago, %s %s"
                 .format (nick, chan, since, doing, niceTime), doCount)
-            if(saying_time exists {_ == time}) {
+                println("%s%s" format (saying_time, time))
+            if(saying_time exists {_ != time}) {
               val niceSaying = formatter.print(new DateTime(saying_time.get))
               val since = Utils.formatSince(saying_time.get.getTime, currentTime)
               troggie ! SendMessage(target, "%s last spoke %s%s ago, %s %s"

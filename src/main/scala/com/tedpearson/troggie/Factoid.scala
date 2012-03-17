@@ -8,15 +8,15 @@ import org.scalaquery.ql.basic.BasicDriver.Implicit._
 
 class Factoid(conf: PluginConf) extends Plugin(conf) {
   implicit val session = conf.session
-  val troggie = context.actorFor("..")
   val db = context.actorOf(Props(new FactoidDb))
   db ! Setup
+  
+  override protected def getStatusString = ""
   
   protected def processMessage(message: IrcMessage): Unit = message match {
     case m: PublicMessage =>
     case m: PrivateMessage =>
     case m: Action =>
-    case m: GetStatus => sender ! Status("")
     case _ =>
   }
   
