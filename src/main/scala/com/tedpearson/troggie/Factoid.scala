@@ -12,21 +12,63 @@ import akka.dispatch.Await
 
 class Factoid(conf: PluginConf) extends Plugin(conf) {
   implicit val session = conf.session
+  implicit val timeout = Timeout(5000L)
+  import conf.p
+  val doPrivate = p.getProperty("enable_privateupdate") == "true"
+  val maxKeyLen = p.getProperty("infobot_keylen", "60").toInt
+  val maxValLen = p.getProperty("infobot_vallen", "500").toInt
+  val volunteerLen = p.getProperty("infobot_volunteer_length", "8").toInt
   val db = context.actorOf(Props(new FactoidDb))
+  var (modifications, questions, nick) = (0,0,"")
   db ! Setup
-  //testing
-//  db ! Update("FoO","bsdfsdfar","is")
-//  db ! Concat("foo"," as if")
-//  implicit val timeout = Timeout(5000L)
-//  println(Await.result(db ? MaxId, timeout.duration))
   
-  override protected def getStatusString = ""
+  override protected def getStatusString = {
+    val count = Await.result(db ? Count, timeout.duration)
+    "Factoids modified/queried: %n/%n. %n Factoids currently exist." format(modifications, questions, count)
+  }
   
+  val Channel = """#.+""".r
   protected def processMessage(message: IrcMessage): Unit = message match {
-    case m: PublicMessage =>
-    case m: PrivateMessage =>
-    case m: Action =>
+    case m: PublicMessage => matchMessage(m.channel, m.sender, m.msg, false)
+    case m: PrivateMessage => matchMessage(m.sender, m.sender, m.msg, true)
+    case m: Action => m.target match {
+      case Channel() =>  matchMessage(m.target, m.sender, m.action, false)
+      case _ => matchMessage(m.sender, m.sender, m.action, true)
+    }
+    case m: SelfNickChange => {
+      nick = m.newNick
+      SetFact = """(?i)(no,?\s+(?:%s,?)?\s+)?(.+?)\s+(is|are)\s+(.+)""".format(nick).r
+    }
     case _ =>
+  }
+  
+  val Fix = """(?i)(?:what|where|who)(?:\s+(?:is|are)|\'s|\'re)\s+(.+)$""".r
+  val Iam = "(?i)^i am".r
+  val FactNumber = """(?i)fact(?:oid)? #?(\d+)\?*""".r
+  // initially will respond to any addressing
+  var SetFact = """(?i)(no,?\s+(?:\w+,?)?\s+)?(.+?)\s+(is|are)\s+(.+)""".r
+  val ForgetFact = """(?i)forget (.+)""".r
+  val LiteralFact = """(?i)literal (.+)""".r
+  val RandomFact = """(?i)random fact\?*""".r
+  
+  def matchMessage(target: String, sender: String, message: String, isPrivate: Boolean) {
+    val Addressed = """^%s\s*(?:[:,]|\s+)(.+)""".format(nick).r
+    var (msg, addressed) = message.trim() match {
+      case Addressed(str) => (str, true)
+      case msg => (msg, false)
+    }
+    msg = msg match {
+      case Fix(str) => str.replace(" is ", """ \is """).replace(" are ",""" \are """)
+      case _ => msg
+    }
+    msg = Iam.replaceFirstIn(msg, "%s is ".format(sender))
+    msg match {
+      case FactNumber(num) =>
+      case SetFact(no, key, isAre, value) =>
+      case ForgetFact(key) =>
+      case LiteralFact(key) =>
+      case RandomFact() =>
+    }
   }
   
   case object Setup
