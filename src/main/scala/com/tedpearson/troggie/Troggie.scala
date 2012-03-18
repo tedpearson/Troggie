@@ -79,7 +79,7 @@ class Troggie(network: String) extends PircBot with Actor {
   
   def receive = {
     case m: SendMessage => {
-      if(m.count) sentMsgs += 1
+      sentMsgs += 1
       sendMessage(m.target, m.msg)
     }
     case _ => println("unknown message")
@@ -98,7 +98,7 @@ class Troggie(network: String) extends PircBot with Actor {
         val result = Await.result(fList, Timeout(1 second).duration).filter(_.status != "")
         val status = for (s <- result) yield s.status
         self ! SendMessage(from, "Uptime: %s. Messages in/out: %d/%d. %s"
-          format(period, recdMsgs, sentMsgs, status.mkString(""," ","")), true)
+          format(period, recdMsgs, sentMsgs, status.mkString(""," ","")))
       }
     }
   }

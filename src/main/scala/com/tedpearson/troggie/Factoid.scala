@@ -19,12 +19,12 @@ class Factoid(conf: PluginConf) extends Plugin(conf) {
   val maxValLen = p.getProperty("infobot_vallen", "500").toInt
   val volunteerLen = p.getProperty("infobot_volunteer_length", "8").toInt
   val db = context.actorOf(Props(new FactoidDb))
-  var (modifications, questions, nick) = (0,0,"")
+  var (modifications, queries, nick) = (0,0,"")
   db ! Setup
   
   override protected def getStatusString = {
     val count = Await.result(db ? Count, timeout.duration)
-    "Factoids modified/queried: %n/%n. %n Factoids currently exist." format(modifications, questions, count)
+    "Factoids modified/queried: %n/%n. %n Factoids currently exist." format(modifications, queries, count)
   }
   
   val Channel = """#.+""".r
@@ -47,8 +47,8 @@ class Factoid(conf: PluginConf) extends Plugin(conf) {
   val FactNumber = """(?i)fact(?:oid)? #?(\d+)\?*""".r
   // initially will respond to any addressing
   var SetFact = """(?i)(no,?\s+(?:\w+,?)?\s+)?(.+?)\s+(is|are)\s+(.+)""".r
-  val ForgetFact = """(?i)forget (.+)""".r
-  val LiteralFact = """(?i)literal (.+)""".r
+  val ForgetFact = """(?i)forget\s+(.+)\s*""".r
+  val LiteralFact = """(?i)literal\s+(.+)\?*\s*""".r
   val RandomFact = """(?i)random fact\?*""".r
   
   def matchMessage(target: String, sender: String, message: String, isPrivate: Boolean) {
@@ -62,13 +62,47 @@ class Factoid(conf: PluginConf) extends Plugin(conf) {
       case _ => msg
     }
     msg = Iam.replaceFirstIn(msg, "%s is ".format(sender))
+    implicit val p: Boolean = isPrivate
     msg match {
-      case FactNumber(num) =>
-      case SetFact(no, key, isAre, value) =>
-      case ForgetFact(key) =>
-      case LiteralFact(key) =>
-      case RandomFact() =>
+      case FactNumber(num) => {
+        queries += 1
+        Await.result(db ? FindById(num.toInt), timeout.duration) match {
+          case Some((key, value, isAre)) => 
+            troggie ! SendMessage(target, "Factoid #%n: %s %s %s".format(num, key, value, isAre))
+          case None => troggie ! SendMessage(target, "Factoid #%n does not exist." format num)
+        }
+      }
+      case SetFact(no, key, isAre, value) => pck {
+        
+      }
+      case ForgetFact(k) => pck {
+        val key = if(k.equalsIgnoreCase("me")) sender else k
+        Await.result(db ? Find(key), timeout.duration) match {
+          case Some => {
+            db ! Delete(key)
+            modifications += 1
+            troggie ! SendMessage(target, "I forgot '%s', %s".format(key, sender))
+          }
+          case None => troggie ! SendMessage(target, 
+              "I don't have anything matching '%s', %s".format(key, sender))
+        }
+      }
+      case LiteralFact(k) => {
+        queries += 1
+        Await.result(db ? Find(k), timeout.duration) match {
+          case Some =>
+          case None => troggie ! SendMessage(target, 
+              "I don't have anything matching '%s', %s".format(k, sender))
+        }
+      }
+      case RandomFact() => {
+        queries += 1
+      }
     }
+  }
+  
+  def pck[A](a: => A)(implicit isPrivate: Boolean) = if(!isPrivate || doPrivate) {
+    a
   }
   
   case object Setup
@@ -99,7 +133,9 @@ class Factoid(conf: PluginConf) extends Plugin(conf) {
       case Concat(key, also) => {
         val row = for(i <- IsTable if lowerc(i.key) === lowers(key)) yield i.value
         row.firstOption match {
-          case Some(s) => row.update(s ++ also) 
+          case Some(s) => {
+            row.update(s ++ also)
+          }
           case None =>
         }
       }

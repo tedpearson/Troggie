@@ -38,7 +38,7 @@ case class GetStatus() extends IrcMessage
 
 sealed trait PluginMessage extends TroggieMessage
 
-case class SendMessage(target: String, msg: String, count: Boolean) extends PluginMessage
+case class SendMessage(target: String, msg: String) extends PluginMessage
 case class SendNotice(target: String, notice: String) extends PluginMessage
 case class SendAction(target: String, msg: String) extends PluginMessage
 case class GetUsers(channel: String) extends PluginMessage

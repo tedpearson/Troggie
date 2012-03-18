@@ -44,13 +44,13 @@ class UrlTitle(conf: PluginConf) extends Plugin(conf) {
             }
             override def handleText(data: Array[Char], pos: Int): Unit = if(foundTitle) {
               count += 1
-              troggie ! SendMessage(target, "[ %s ]" format new String(data), true)
+              troggie ! SendMessage(target, "[ %s ]" format new String(data))
             }
           }, true)
         } catch {
           case e: IOException => {
             if(!e.getMessage().contains("stream is closed")) {
-              troggie ! SendMessage(target, "Error accessing '%s'" format url, true)
+              troggie ! SendMessage(target, "Error accessing '%s'" format url)
             }
           }
         }

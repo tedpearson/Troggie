@@ -63,20 +63,22 @@ class Seen(conf: PluginConf) extends Plugin(conf) {
       case SeenQuery(nick) => {
         db ? Find(nick) mapTo manifest[Saw] onSuccess {
           case Saw(nick, time, doing, channel, saying, saying_time) => {
-            val doCount = m.isInstanceOf[PublicMessage]
-            val target = if(doCount) m.asInstanceOf[PublicMessage].channel else m.sender
+            val target = m match {
+              case m: PublicMessage => m.channel
+              case _ => m.sender
+            }
             val chan = if(channel.isDefined) "on %s " format channel.getOrElse("") else ""
             val since = Utils.formatSince(time.getTime, currentTime)
             // TODO: format time
             val niceTime = formatter.print(new DateTime(time))
             troggie ! SendMessage(target, "%s was last seen %s%s ago, %s %s"
-                .format (nick, chan, since, doing, niceTime), doCount)
+                .format (nick, chan, since, doing, niceTime))
                 println("%s%s" format (saying_time, time))
             if(saying_time exists {_ != time}) {
               val niceSaying = formatter.print(new DateTime(saying_time.get))
               val since = Utils.formatSince(saying_time.get.getTime, currentTime)
               troggie ! SendMessage(target, "%s last spoke %s%s ago, %s %s"
-                  .format (nick, chan, since, saying.get, niceSaying), doCount)
+                  .format (nick, chan, since, saying.get, niceSaying))
             }
           }
         }
