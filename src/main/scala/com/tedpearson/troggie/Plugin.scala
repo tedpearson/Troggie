@@ -31,6 +31,9 @@ abstract class Plugin(conf: PluginConf) extends Actor {
       table.ddl.create
     }
   }
+  protected def send(target: String, msg: String) {
+    troggie ! SendMessage(target, msg)
+  }
 }
 
 case class PluginConf(p: Properties, session: Session) {}

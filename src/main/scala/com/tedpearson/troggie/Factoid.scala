@@ -18,13 +18,13 @@ class Factoid(conf: PluginConf) extends Plugin(conf) {
   val maxKeyLen = p.getProperty("infobot_keylen", "60").toInt
   val maxValLen = p.getProperty("infobot_vallen", "500").toInt
   val volunteerLen = p.getProperty("infobot_volunteer_length", "8").toInt
-  val db = context.actorOf(Props(new FactoidDb))
+  import FactoidDb._
   var (modifications, queries, nick) = (0,0,"")
-  db ! Setup
+  setup
   
   override protected def getStatusString = {
-    val count = Await.result(db ? Count, timeout.duration)
-    "Factoids modified/queried: %n/%n. %n Factoids currently exist." format(modifications, queries, count)
+    val count = FactoidDb.count
+    "Factoids modified/queried: %d/%d. %d Factoids currently exist." format(modifications, queries, count)
   }
   
   val Channel = """#.+""".r
@@ -46,9 +46,9 @@ class Factoid(conf: PluginConf) extends Plugin(conf) {
   val Iam = "(?i)^i am".r
   val FactNumber = """(?i)fact(?:oid)? #?(\d+)\?*""".r
   // initially will respond to any addressing
-  var SetFact = """(?i)(no,?\s+(?:\w+,?)?\s+)?(.+?)\s+(is|are)\s+(.+)""".r
+  var SetFact = """(?i)(no,?\s+(?:\w+,?)?\s+)?(.+?)\s+(is|are)\s+(.+)\s*""".r
   val ForgetFact = """(?i)forget\s+(.+)\s*""".r
-  val LiteralFact = """(?i)literal\s+(.+)\?*\s*""".r
+  val LiteralFact = """(?i)literal\s+(.+)\s*\?*\s*""".r
   val RandomFact = """(?i)random fact\?*""".r
   
   def matchMessage(target: String, sender: String, message: String, isPrivate: Boolean) {
@@ -66,10 +66,10 @@ class Factoid(conf: PluginConf) extends Plugin(conf) {
     msg match {
       case FactNumber(num) => {
         queries += 1
-        Await.result(db ? FindById(num.toInt), timeout.duration) match {
+        findById(num.toInt) match {
           case Some((key, value, isAre)) => 
-            troggie ! SendMessage(target, "Factoid #%n: %s %s %s".format(num, key, value, isAre))
-          case None => troggie ! SendMessage(target, "Factoid #%n does not exist." format num)
+            send(target, "Factoid #%s: %s %s %s".format(num, key, isAre, value))
+          case None => send(target, "Factoid #%s does not exist." format num)
         }
       }
       case SetFact(no, key, isAre, value) => pck {
@@ -77,27 +77,45 @@ class Factoid(conf: PluginConf) extends Plugin(conf) {
       }
       case ForgetFact(k) => pck {
         val key = if(k.equalsIgnoreCase("me")) sender else k
-        Await.result(db ? Find(key), timeout.duration) match {
-          case Some => {
-            db ! Delete(key)
+        find(key) match {
+          case Some(_) => {
+            delete(key)
             modifications += 1
-            troggie ! SendMessage(target, "I forgot '%s', %s".format(key, sender))
+            send(target, "I forgot '%s', %s".format(key, sender))
           }
-          case None => troggie ! SendMessage(target, 
-              "I don't have anything matching '%s', %s".format(key, sender))
+          case None => send(target, "I don't have anything matching '%s', %s".format(key, sender))
         }
       }
       case LiteralFact(k) => {
         queries += 1
-        Await.result(db ? Find(k), timeout.duration) match {
-          case Some =>
-          case None => troggie ! SendMessage(target, 
-              "I don't have anything matching '%s', %s".format(k, sender))
+        find(k) match {
+          case Some((key, value, isAre)) => send(target, "%s =%s= %s".format(key, isAre, value))
+          case None => send(target, "I don't have anything matching '%s', %s".format(k, sender))
         }
       }
       case RandomFact() => {
         queries += 1
+        val max = maxId.get
+        import util.control.Breaks._
+        breakable {
+          import util.Random.nextInt
+          import akka.dispatch.Future
+          implicit val ec = context.system
+          // don't let this block the actor
+          Future {
+            while(true) {
+              val random = nextInt(max + 1)
+              findById(random) collect {
+                case (key, value, isAre) => {
+                  send(target, "Factoid #%d: %s %s %s".format(random, key, isAre, value))
+                  break
+                }
+              }
+            }
+          }
+        }
       }
+      case _ =>
     }
   }
   
@@ -105,50 +123,37 @@ class Factoid(conf: PluginConf) extends Plugin(conf) {
     a
   }
   
-  case object Setup
-  case class Update(key: String, value: String, isAre: String)
-  case class Find(key: String)
-  case class Delete(key: String)
-  case class Concat(key: String, also: String)
-  case object Count
-  case class FindById(id: Int)
-  case object MaxId
-  
-  class FactoidDb(implicit session: Session) extends Actor {
-    def receive = {
-      case Setup => createIfNotExists(IsTable)
-      case Update(key, value, isAre) => {
-        val row = for(i <- IsTable if lowerc(i.key) === lowers(key)) yield i.edit
-        if(row.firstOption.isEmpty) IsTable.all insert (key, value, isAre)
-        else row.update((value, isAre))
-      }
-      case Find(key) => {
-        val row = for(i <- IsTable if lowerc(i.key) === lowers(key)) yield i.all
-        sender ! row.firstOption
-      }
-      case Delete(key) => {
-        val row = for(i <- IsTable if lowerc(i.key) === lowers(key)) yield i
-        row.delete
-      }
-      case Concat(key, also) => {
-        val row = for(i <- IsTable if lowerc(i.key) === lowers(key)) yield i.value
-        row.firstOption match {
-          case Some(s) => {
-            row.update(s ++ also)
-          }
-          case None =>
+  object FactoidDb {
+    def setup = createIfNotExists(IsTable)
+    def update(key: String, value: String, isAre: String) {
+      val row = for(i <- IsTable if lowerc(i.key) === lowers(key)) yield i.edit
+      if(row.firstOption.isEmpty) IsTable.all insert (key, value, isAre)
+      else row.update((value, isAre))
+    }
+    def find(key: String) = {
+      val row = for(i <- IsTable if lowerc(i.key) === lowers(key)) yield i.all
+      row.firstOption
+    }
+    def delete(key: String) {
+      val row = for(i <- IsTable if lowerc(i.key) === lowers(key)) yield i
+      row.delete
+    }
+    def concat(key: String, also: String) {
+      val row = for(i <- IsTable if lowerc(i.key) === lowers(key)) yield i.value
+      row.firstOption match {
+        case Some(s) => {
+          row.update(s ++ also)
         }
+        case None =>
       }
-      case Count => 
-        sender ! Query(IsTable.count).first
-      case FindById(id) => {
-        val row = for(i <- IsTable if i.id === id) yield i.all
-        sender ! row.firstOption
-      }
-      case MaxId => {
-        sender ! Query(IsTable.id.max).first
-      }
-      case _ => println("Unsupported msg")
+    }
+    def count = Query(IsTable.count).first
+    def findById(id: Int) = {
+      val row = for(i <- IsTable if i.id === id) yield i.all
+      row.firstOption
+    }
+    def maxId = {
+      Query(IsTable.id.max).first
     }
   }
   

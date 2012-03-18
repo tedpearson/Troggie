@@ -19,7 +19,7 @@ class UrlTitle(conf: PluginConf) extends Plugin(conf) {
   var count = 0
   def getStatusString = " Urls retrieved: %d." format count
   
-  val Url = """(https?://[^ ]+)""".r
+  val Url = """.*?(https?://\S+).*""".r
   private def getUrlTitle(msg: String, target: String, sender: String): Unit = msg match {
     case Url(url) => Future {
       val conn = new URL(url).openConnection()
