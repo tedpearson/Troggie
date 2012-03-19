@@ -39,6 +39,7 @@ class Troggie(network: String) extends PircBot with Actor {
   val session = Database.forURL("jdbc:sqlite:%s" format database, driver = "org.sqlite.JDBC").createSession()
   val plugins = loadPlugins
   val router = context.actorOf(Props[Plugin].withRouter(BroadcastRouter(routees = plugins)), name="router")
+  router ! SelfNickChange(nick)
   implicit val system = context.system
   
   // don't connect until actor is started
@@ -179,6 +180,7 @@ class Troggie(network: String) extends PircBot with Actor {
   override def onKick(channel: String, sender: String, login: String, host: String, rcpt: String, msg: String) {
     rcpt match {
       case `nick` => {
+        // TODO make async
         Thread sleep 1000
         joinChannel(channel)
       }
@@ -189,7 +191,7 @@ class Troggie(network: String) extends PircBot with Actor {
   
   override def onNickChange(oldNick: String, login: String, host: String, newNick: String) {
     oldNick match {
-      case `nick` => send(SelfNickChange(oldNick, login, host, newNick))
+      case `nick` => send(SelfNickChange(newNick))
       case _ => send(NickChange(oldNick, login, host, newNick))
     }
   }

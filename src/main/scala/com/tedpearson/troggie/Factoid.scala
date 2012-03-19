@@ -15,7 +15,7 @@ class Factoid(conf: PluginConf) extends Plugin(conf) {
   implicit val timeout = Timeout(5000L)
   import conf.p
   val doPrivate = p.getProperty("enable_privateupdate") == "true"
-  val maxKeyLen = p.getProperty("infobot_keylen", "60").toInt
+  val maxKeyLen = p.getProperty("infobot_keylen", "30").toInt
   val maxValLen = p.getProperty("infobot_vallen", "500").toInt
   val volunteerLen = p.getProperty("infobot_volunteer_length", "8").toInt
   import FactoidDb._
@@ -37,7 +37,7 @@ class Factoid(conf: PluginConf) extends Plugin(conf) {
     }
     case m: SelfNickChange => {
       nick = m.newNick
-      SetFact = """(?i)(no,?\s+(?:%s,?)?\s+)?(.+?)\s+(is|are)\s+(.+)""".format(nick).r
+      SetFact = SetFactRE.format(nick).r
     }
     case _ =>
   }
@@ -45,14 +45,15 @@ class Factoid(conf: PluginConf) extends Plugin(conf) {
   val Fix = """(?i)(?:what|where|who)(?:\s+(?:is|are)|\'s|\'re)\s+(.+)$""".r
   val Iam = "(?i)^i am".r
   val FactNumber = """(?i)fact(?:oid)? #?(\d+)\?*""".r
-  // initially will respond to any addressing
-  var SetFact = """(?i)(no,?\s+(?:\w+,?)?\s+)?(.+?)\s+(is|are)\s+(.+)\s*""".r
+  // initially will respond to "troggie"
+  val SetFactRE = """(?i)(no,?(?:\s+%s,?)?\s+)?(.+?)\s+(is|are)(\s+also)?\s+(.+)\s*"""
+  var SetFact = SetFactRE.format("troggie").r
   val ForgetFact = """(?i)forget\s+(.+)\s*""".r
   val LiteralFact = """(?i)literal\s+(.+)\s*\?*\s*""".r
   val RandomFact = """(?i)random fact\?*""".r
   
   def matchMessage(target: String, sender: String, message: String, isPrivate: Boolean) {
-    val Addressed = """^%s\s*(?:[:,]|\s+)(.+)""".format(nick).r
+    val Addressed = """^%s\s*[:,]?\s*(.+)""".format(nick).r
     var (msg, addressed) = message.trim() match {
       case Addressed(str) => (str, true)
       case msg => (msg, false)
@@ -72,8 +73,52 @@ class Factoid(conf: PluginConf) extends Plugin(conf) {
           case None => send(target, "Factoid #%s does not exist." format num)
         }
       }
-      case SetFact(no, key, isAre, value) => pck {
-        
+      case SetFact(no, key, isAre, also, value) => pck {
+        val force = no != null
+        // i think this is so you can escape these when you're setting the value in chat
+        val output = value.replaceAll("""(?i)(?:\\(who )|\\(is )|\\(are )|\\(what ))""", "$1$2$3$4")
+        // if value is too long, truncate (shouldn't happen unless on a irc
+        // network that allows long strings)
+        if(key.length > maxKeyLen && addressed) {
+          val str = "Max length for input is %d characters, %s. " +
+          		"Please try a shorter value before the 'is'."
+          send(target, str.format(maxKeyLen, sender))
+      		return
+        }
+        if(output.length > maxValLen && addressed) {
+          send(target, "Max length for output is %d characters, %s. Response truncated."
+              .format(maxKeyLen, sender))
+          return
+        }
+        find(key) match {
+          case Some((origKey, origValue, origIsAre)) => {
+            val isAlso = also != null
+            if(isAlso) {
+              modifications += 1
+              concat(key, " " + output)
+              send(target, "okay, %s." format sender)
+              return
+            }
+            if(origValue == output) {
+              send(target, "I already had it that way, %s." format sender)
+              return
+            }
+            force match {
+              case true => {
+                modifications += 1
+                update(key, value, isAre)
+                send(target, "okay, %s." format sender)
+              }
+              case false => if(addressed) {
+                send(target, "... but %s %s %s ...".format(key, origIsAre, origValue))
+              }
+            }
+          }
+          case None => {
+            modifications += 1
+            update(key, value, isAre)
+          }
+        }
       }
       case ForgetFact(k) => pck {
         val key = if(k.equalsIgnoreCase("me")) sender else k
@@ -115,7 +160,9 @@ class Factoid(conf: PluginConf) extends Plugin(conf) {
           }
         }
       }
-      case _ =>
+      case _ => {
+        // check if it's stored in the db
+      }
     }
   }
   

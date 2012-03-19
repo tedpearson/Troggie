@@ -32,7 +32,7 @@ case class Topic(channel: String, topic: String, sender: String, date: Long, cha
 case class Voice(channel: String, sender: String, login: String, host: String, rcpt: String) extends NickMessage
 case class SelfJoin(channel: String) extends IrcMessage
 case class UserList(users: Array[User]) extends IrcMessage
-case class SelfNickChange(oldNick: String, login: String, host: String, newNick: String) extends IrcMessage
+case class SelfNickChange(newNick: String) extends IrcMessage
 case class GetStatus() extends IrcMessage
 
 
