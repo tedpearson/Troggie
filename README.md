@@ -11,12 +11,3 @@ originally written in Java using Apache Derby (now JavaDB). It then was migrated
 to SQLite for the reduced memory footprint. Now it's being rewritten in Scala
 using [Akka](http://akka.io/) for better concurrency (and to increase my Scala
 proficiency).
-
-Development TODO list:
-----------------------
-
-* handle shutdown nicely (ctrl-c as well as shutdown from within sbt) - have a
-nice quit message
-* implement important or working plugins in Java version before releasing beta:
-  * Factoid
-* default TZ for seen plugin

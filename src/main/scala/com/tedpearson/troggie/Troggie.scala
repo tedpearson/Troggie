@@ -83,6 +83,10 @@ class Troggie(network: String) extends PircBot with Actor {
       sentMsgs += 1
       sendMessage(m.target, m.msg)
     }
+    case m: SendAction => {
+      sentMsgs += 1
+      sendAction(m.target, m.msg)
+    }
     case _ => println("unknown message")
   }
   

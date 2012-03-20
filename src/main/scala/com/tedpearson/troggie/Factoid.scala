@@ -9,6 +9,7 @@ import org.scalaquery.ql.Query
 import akka.pattern.ask
 import akka.util.Timeout
 import akka.dispatch.Await
+import util.Random.nextInt
 
 class Factoid(conf: PluginConf) extends Plugin(conf) {
   implicit val session = conf.session
@@ -42,6 +43,17 @@ class Factoid(conf: PluginConf) extends Plugin(conf) {
     case _ =>
   }
   
+  val randomMsgs = Seq(
+    "Someone said %1$s %3$s %2$s",
+    "%1$s %3$s probably %2$s",
+    "Rumor has it that %1$s %3$s %2$s",
+    "%1$s %3$s %2$s",
+    "it has been said that %1$s %3$s %2$s",
+    "well, %1$s %3$s %2$s",
+    "i think %1$s %3$s %2$s",
+    "%1$s %3$s, like, %2$s"
+  )
+  
   val Fix = """(?i)(?:what|where|who)(?:\s+(?:is|are)|\'s|\'re)\s+(.+)$""".r
   val Iam = "(?i)^i am".r
   val FactNumber = """(?i)fact(?:oid)? #?(\d+)\?*""".r
@@ -51,10 +63,14 @@ class Factoid(conf: PluginConf) extends Plugin(conf) {
   val ForgetFact = """(?i)forget\s+(.+)\s*""".r
   val LiteralFact = """(?i)literal\s+(.+)\s*\?*\s*""".r
   val RandomFact = """(?i)random fact\?*""".r
+  val Question = """(.+?)\?+""".r
+  val Me = "(?i)me".r
+  val Alias = """@\s*(.+?)\s*""".r
+  val Action = """(?i)<(?:(action)|(reply))>\s*(.+)""".r
   
   def matchMessage(target: String, sender: String, message: String, isPrivate: Boolean) {
     val Addressed = """^%s\s*[:,]?\s*(.+)""".format(nick).r
-    var (msg, addressed) = message.trim() match {
+    var (msg, addressed) = message.trim match {
       case Addressed(str) => (str, true)
       case msg => (msg, false)
     }
@@ -143,7 +159,6 @@ class Factoid(conf: PluginConf) extends Plugin(conf) {
         val max = maxId.get
         import util.control.Breaks._
         breakable {
-          import util.Random.nextInt
           import akka.dispatch.Future
           implicit val ec = context.system
           // don't let this block the actor
@@ -162,6 +177,43 @@ class Factoid(conf: PluginConf) extends Plugin(conf) {
       }
       case _ => {
         // check if it's stored in the db
+        msg = msg.replace(""" \is """, " is ").replace(""" \are """, " are ").trim
+        msg match {
+          case Question(question) => msg = question
+          case _ => if(msg.length < volunteerLen) return
+        }
+        msg = msg match {
+          case Me() => sender 
+          case _ => msg
+        }
+        find(msg) match {
+          case Some((key, value, isAre)) => {
+            queries += 1
+            var output = value match {
+              case Alias(at) => find(at) match {
+                case Some((_, value, _)) => value
+                case _ => return
+              }
+              case _ => value
+            }
+            output = output.replace("$who", sender)
+            // random
+            if(output.contains("|")) {
+              val alts = output.split("""\|""")
+              output = alts(nextInt(alts.length)).trim
+            }
+            output match {
+              case Action(action, reply, msg) =>
+                if(reply != null) {
+                send(target, msg)
+              } else {
+                troggie ! SendAction(target, output)
+              }
+              case _ => send(target, randomMsgs(nextInt(randomMsgs.length)).format(key, output, isAre))
+            }
+          }
+          case _ =>
+        }
       }
     }
   }
