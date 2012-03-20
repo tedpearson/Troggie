@@ -1,3 +1,5 @@
+import AssemblyKeys._
+
 name := "Troggie"
 
 version := "1.0"
@@ -20,3 +22,7 @@ libraryDependencies ++= Seq(
 )
 
 scalacOptions ++= Seq("-unchecked", "-deprecation")
+
+seq(assemblySettings: _*)
+
+jarName in assembly := "Troggie.jar"
