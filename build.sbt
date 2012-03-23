@@ -2,7 +2,7 @@ import AssemblyKeys._
 
 name := "Troggie"
 
-version := "1.0"
+version := "3.0"
 
 scalaVersion := "2.9.1"
 

@@ -23,7 +23,7 @@ import akka.dispatch.Await
 
 class Troggie(network: String) extends PircBot with Actor {
   var (sentMsgs, recdMsgs) = (0L, 0L)
-  val version = "3.0b1"
+  val version = "3.0.1"
   import Troggie._ => t
   val logfile = new File(properties.getProperty("logfile","troggie.log"))
   logfile.createNewFile
