@@ -40,6 +40,7 @@ class Troggie(network: String) extends PircBot with Actor {
   val plugins = loadPlugins
   val router = context.actorOf(Props[Plugin].withRouter(BroadcastRouter(routees = plugins)), name="router")
   router ! SelfNickChange(nick)
+  sys.addShutdownHook(quitServer("Troggie 3 signing off!"))
   implicit val system = context.system
   
   // don't connect until actor is started
