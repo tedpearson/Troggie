@@ -14,11 +14,18 @@ import org.scalaquery.session.Session
 import akka.actor.{Props, Actor}
 import akka.pattern.ask
 import akka.util.Timeout
+import org.joda.time.DateTimeZone
 
 class Seen(conf: PluginConf) extends Plugin(conf) {
   implicit val session: Session = conf.session
   import SeenDb._
   val formatter = DateTimeFormat.forPattern("[EEE MMM d, HH:mm:ss yyyy z]")
+  val defaultTz = "America/New_York"
+  val tz = try {
+    DateTimeZone.forID(conf.p.getProperty("seen_tz",defaultTz))
+  } catch {
+    case _ => DateTimeZone.forID(defaultTz)
+  }
   setup
   
   override protected def getStatusString = ""
@@ -70,11 +77,12 @@ class Seen(conf: PluginConf) extends Plugin(conf) {
             val chan = if(channel.isDefined) "on %s " format channel.getOrElse("") else ""
             val since = Utils.formatSince(time.getTime, currentTime)
             // TODO: format time
-            val niceTime = formatter.print(new DateTime(time))
+            val niceTime = formatter.print(new DateTime(time).withZone(tz))
+            println(niceTime)
             send(target, "%s was last seen %s%s ago, %s %s"
                 .format (nick, chan, since, doing, niceTime))
             if(saying_time exists {_ != time}) {
-              val niceSaying = formatter.print(new DateTime(saying_time.get))
+              val niceSaying = formatter.print(new DateTime(saying_time.get).withZone(tz))
               val since = Utils.formatSince(saying_time.get.getTime, currentTime)
               send(target, "%s last spoke %s%s ago, %s %s"
                   .format (nick, chan, since, saying.get, niceSaying))

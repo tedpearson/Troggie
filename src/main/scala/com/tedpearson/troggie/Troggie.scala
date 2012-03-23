@@ -126,10 +126,10 @@ class Troggie(network: String) extends PircBot with Actor {
   override def log(line: String) {
     if(!line.contains("PING :") & !line.contains("PONG :")) {
       val toLog = currentTime + " " + line
-          log.write(toLog)
-          log.newLine()
-          log.flush
-          Console.println(toLog)
+      log.write(toLog)
+      log.newLine()
+      log.flush
+      if(echo != false) Console.println(toLog)
     }
   }
   
@@ -254,8 +254,8 @@ object Troggie extends App {
     system.actorOf(Props(new Troggie(n)), name=n)
   }
   
-  Thread.currentThread.getName match {
-    case "main" =>
+  val echo = Thread.currentThread.getName match {
+    case "main" => false
     case _ => {
       pressKeyToStop
     }
